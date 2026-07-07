@@ -299,7 +299,8 @@
         <button class="tabbtn active" id="tabAll">전체 보기</button>
         <button class="tabbtn" id="tabTeam">팀별 보기</button>
         <select id="teamFilterSelect" class="hidden"></select>
-        <button id="adminRefreshBtn" style="margin-left:auto;">새로고침</button>
+        <button id="adminDownloadBtn" style="margin-left:auto;">엑셀 다운로드</button>
+        <button id="adminRefreshBtn">새로고침</button>
       </div>
       <div class="summary-grid" id="summaryGrid"></div>
     </div>
@@ -639,6 +640,45 @@ function currentRows(){
   return adminData.rows.filter(function(r){ return r.leader === currentTeamFilter; });
 }
 
+function formatName(r){
+  return currentTeamFilter ? r.name : (r.name + '(' + r.leader + ')');
+}
+
+function csvEscape(s){
+  s = String(s == null ? '' : s);
+  if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function slotLabel(key){
+  var day = DAYS.filter(function(d){ return key.indexOf(d.key) === 0; })[0];
+  var h = parseInt(key.split('_')[1], 10);
+  return (day ? day.label : '') + ' ' + hourLabel(h);
+}
+
+function downloadCsv(){
+  if (!adminData) return;
+  var rows = currentRows();
+  var header = ['이름', '팀장', EVENTS[0].label, EVENTS[1].label, EVENTS[2].label, EVENTS[3].label, '참가 가능 시간'];
+  var lines = [header.map(csvEscape).join(',')];
+  rows.forEach(function(r){
+    var slots = (r.grid || []).map(slotLabel).join('; ');
+    var cols = [r.name, r.leader, r.events[0]?'O':'', r.events[1]?'O':'', r.events[2]?'O':'', r.events[3]?'O':'', slots];
+    lines.push(cols.map(csvEscape).join(','));
+  });
+  var csv = '﻿' + lines.join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'SP참가시간_' + (currentTeamFilter || '전체') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+document.getElementById('adminDownloadBtn').addEventListener('click', downloadCsv);
+
 function renderAdmin(){
   if (!adminData) return;
   var rows = currentRows();
@@ -670,7 +710,7 @@ function renderAdmin(){
     var panel = document.createElement('div');
     panel.className = 'expand-panel hidden';
     panel.innerHTML = respondents.length
-      ? respondents.map(function(r){ return r.name + ' (' + r.leader + ')'; }).join(', ')
+      ? respondents.map(formatName).join(', ')
       : '<span class="none">참가 가능 인원이 없습니다.</span>';
     row.addEventListener('click', function(){ panel.classList.toggle('hidden'); });
     evListEl.appendChild(row);
@@ -690,7 +730,7 @@ function renderAdmin(){
     (r.grid || []).forEach(function(key){
       if (counts[key] === undefined) return;
       counts[key]++;
-      names[key].push(r.name + '(' + r.leader + ')');
+      names[key].push(formatName(r));
     });
   });
   buildGrid('adminGridContainer', { readOnly: true, counts: counts, names: names });
