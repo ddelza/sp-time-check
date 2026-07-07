@@ -299,7 +299,8 @@
         <button class="tabbtn active" id="tabAll">전체 보기</button>
         <button class="tabbtn" id="tabTeam">팀별 보기</button>
         <select id="teamFilterSelect" class="hidden"></select>
-        <button id="adminDownloadBtn" style="margin-left:auto;">엑셀 다운로드</button>
+        <button id="adminDownloadBtn" style="margin-left:auto;">엑셀 다운로드(raw)</button>
+        <button id="adminDownloadGridBtn">엑셀 다운로드(날짜·시간별)</button>
         <button id="adminRefreshBtn">새로고침</button>
       </div>
       <div class="summary-grid" id="summaryGrid"></div>
@@ -656,6 +657,19 @@ function slotLabel(key){
   return (day ? day.label : '') + ' ' + hourLabel(h);
 }
 
+function triggerCsvDownload(lines, filenameSuffix){
+  var csv = '﻿' + lines.join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'SP참가시간_' + (currentTeamFilter || '전체') + '_' + filenameSuffix + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function downloadCsv(){
   if (!adminData) return;
   var rows = currentRows();
@@ -666,18 +680,32 @@ function downloadCsv(){
     var cols = [r.name, r.leader, r.events[0]?'O':'', r.events[1]?'O':'', r.events[2]?'O':'', r.events[3]?'O':'', slots];
     lines.push(cols.map(csvEscape).join(','));
   });
-  var csv = '﻿' + lines.join('\r\n');
-  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'SP참가시간_' + (currentTeamFilter || '전체') + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  triggerCsvDownload(lines, 'raw');
 }
 document.getElementById('adminDownloadBtn').addEventListener('click', downloadCsv);
+
+function downloadTimeGridCsv(){
+  if (!adminData) return;
+  var rows = currentRows();
+  var stats = computeGridStats(rows);
+  var header = ['시간'].concat(DAYS.map(function(d){ return d.label + ' 인원수'; }))
+    .concat(DAYS.map(function(d){ return d.label + ' 이름'; }));
+  var lines = [header.map(csvEscape).join(',')];
+  HOURS.forEach(function(h){
+    var row = [hourLabel(h)];
+    var nameCols = [];
+    DAYS.forEach(function(day){
+      if (!cellEnabled(day, h)) { row.push(''); nameCols.push(''); return; }
+      var key = slotKey(day.key, h);
+      row.push(stats.counts[key] || 0);
+      nameCols.push((stats.names[key] || []).join(', '));
+    });
+    row = row.concat(nameCols);
+    lines.push(row.map(csvEscape).join(','));
+  });
+  triggerCsvDownload(lines, '날짜시간별');
+}
+document.getElementById('adminDownloadGridBtn').addEventListener('click', downloadTimeGridCsv);
 
 function renderAdmin(){
   if (!adminData) return;
@@ -718,6 +746,15 @@ function renderAdmin(){
   });
 
   // 시간 그리드 카운트
+  var gridStats = computeGridStats(rows);
+  buildGrid('adminGridContainer', { readOnly: true, counts: gridStats.counts, names: gridStats.names });
+
+  var expandEl = document.getElementById('adminGridExpand');
+  expandEl.innerHTML = '';
+  attachAdminGridInteractions(gridStats.names);
+}
+
+function computeGridStats(rows){
   var counts = {}, names = {};
   DAYS.forEach(function(day){
     HOURS.forEach(function(h){
@@ -733,11 +770,7 @@ function renderAdmin(){
       names[key].push(formatName(r));
     });
   });
-  buildGrid('adminGridContainer', { readOnly: true, counts: counts, names: names });
-
-  var expandEl = document.getElementById('adminGridExpand');
-  expandEl.innerHTML = '';
-  attachAdminGridInteractions(names);
+  return { counts: counts, names: names };
 }
 
 function attachAdminGridInteractions(names){
