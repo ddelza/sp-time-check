@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>SP 참가 가능 시간 체크</title>
+<style>
+  :root{
+    --green:#4caf50;
+    --green-light:#c8e6c9;
+    --grey:#e0e0e0;
+    --grey-dark:#bdbdbd;
+    --blue:#1976d2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    background:#f4f6f8;
+    color:#222;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .hidden{display:none !important;}
+  #inappBanner{
+    background:#fff3cd;
+    color:#664d03;
+    padding:10px 14px;
+    font-size:13px;
+    text-align:center;
+    border-bottom:1px solid #ffe69c;
+  }
+  #inappBanner button{
+    margin-left:8px;
+    background:#664d03;
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:12px;
+  }
+  .wrap{
+    max-width:480px;
+    margin:0 auto;
+    padding:16px 14px 60px;
+  }
+  .wrap.admin-wide{max-width:920px;}
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:14px;
+  }
+  h1{font-size:18px;margin:0;}
+  #adminToggleBtn{
+    background:#37474f;
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:12px;
+    cursor:pointer;
+  }
+  .card{
+    background:#fff;
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+  }
+  label.field-label{
+    display:block;
+    font-size:13px;
+    font-weight:bold;
+    margin-bottom:6px;
+    color:#444;
+  }
+  input[type=text], select, input[type=password]{
+    width:100%;
+    padding:10px;
+    border:1px solid #d0d5da;
+    border-radius:8px;
+    font-size:15px;
+    margin-bottom:12px;
+  }
+  .event-item{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 4px;
+    border-bottom:1px solid #eee;
+    font-size:14px;
+  }
+  .event-item:last-child{border-bottom:none;}
+  .event-item input{width:auto;margin:2px 0 0 0;}
+  .section-title{
+    font-size:14px;
+    font-weight:bold;
+    margin:0 0 8px;
+    color:#333;
+  }
+  .grid-note{
+    font-size:12px;
+    color:#888;
+    margin-bottom:10px;
+  }
+  table.timegrid{
+    border-collapse:collapse;
+    width:100%;
+    table-layout:fixed;
+    user-select:none;
+  }
+  table.timegrid th{
+    font-size:12px;
+    padding:4px 2px;
+    background:#f0f2f4;
+    border:1px solid #e2e5e8;
+  }
+  table.timegrid td{
+    border:1px solid #e2e5e8;
+    height:22px;
+    text-align:center;
+    font-size:10px;
+    color:#666;
+    touch-action:none;
+  }
+  table.timegrid td.timelabel{
+    background:#fafbfc;
+    font-size:10px;
+    color:#999;
+    width:52px;
+  }
+  .cell{cursor:pointer;background:#fff;}
+  .cell.disabled{background:repeating-linear-gradient(45deg,#eee,#eee 4px,#f6f6f6 4px,#f6f6f6 8px);cursor:not-allowed;}
+  .cell.selected{background:var(--green);}
+  .cell.count-cell{cursor:pointer;font-weight:bold;color:#2e7d32;}
+  .cell.count-cell.has-data{text-decoration:underline dotted;}
+  .cell.count-zero{color:#bbb;font-weight:normal;cursor:default;}
+  button.submit-btn{
+    width:100%;
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:14px;
+    font-size:15px;
+    font-weight:bold;
+    cursor:pointer;
+    margin-top:6px;
+  }
+  button.submit-btn:disabled{background:#9fb8cc;cursor:not-allowed;}
+  #statusMsg{
+    text-align:center;
+    font-size:13px;
+    margin-top:10px;
+    min-height:16px;
+  }
+  #statusMsg.ok{color:var(--green);}
+  #statusMsg.err{color:#d32f2f;}
+
+  .modal-overlay{
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.45);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .modal-box{
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    width:100%;
+    max-width:320px;
+  }
+  .modal-box h3{margin-top:0;font-size:15px;}
+  .modal-actions{display:flex;gap:8px;}
+  .modal-actions button{
+    flex:1;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .modal-actions .cancel{background:#eee;color:#333;}
+  .modal-actions .confirm{background:var(--blue);color:#fff;}
+
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(90px,1fr));
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .summary-box{
+    background:#f0f7ff;
+    border-radius:8px;
+    padding:10px 8px;
+    text-align:center;
+  }
+  .summary-box .num{font-size:18px;font-weight:bold;color:var(--blue);}
+  .summary-box .lbl{font-size:11px;color:#555;margin-top:2px;}
+
+  .admin-controls{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap;}
+  .admin-controls select, .admin-controls button{width:auto;margin:0;padding:8px 10px;}
+  .tabbtn{
+    border:1px solid #d0d5da;
+    background:#fff;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .tabbtn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+  .event-count-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 4px;
+    border-bottom:1px solid #eee;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .event-count-row .cnt{font-weight:bold;color:var(--blue);}
+  .expand-panel{
+    background:#f7f9fb;
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:12.5px;
+    margin:4px 0 10px;
+    line-height:1.7;
+  }
+  .expand-panel .none{color:#999;}
+
+  #tooltip{
+    position:fixed;
+    background:#222;
+    color:#fff;
+    padding:6px 10px;
+    border-radius:6px;
+    font-size:12px;
+    max-width:220px;
+    line-height:1.5;
+    pointer-events:none;
+    z-index:100;
+    display:none;
+  }
+  .loading{text-align:center;color:#888;font-size:13px;padding:20px 0;}
+</style>
+</head>
+<body>
+
+<div id="inappBanner" class="hidden">
+  카카오톡 등 인앱 브라우저에서는 정상 작동하지 않을 수 있어요.
+  <button id="openExternalBtn">외부 브라우저로 열기</button>
+</div>
+
+<div id="tooltip"></div>
+
+<div class="wrap" id="wrap">
+  <header>
+    <h1>SP 참가 가능 시간 체크</h1>
+    <button id="adminToggleBtn">관리자 모드</button>
+  </header>
+
+  <!-- 제출 화면 -->
+  <div id="submitView">
+    <div class="card">
+      <label class="field-label">이름</label>
+      <input type="text" id="nameInput" placeholder="이름을 입력하세요" autocomplete="off">
+      <label class="field-label">우리 팀 팀장</label>
+      <select id="leaderSelect">
+        <option value="">팀장을 선택하세요</option>
+      </select>
+    </div>
+
+    <div id="checklistArea" class="hidden">
+      <div class="card">
+        <div class="section-title">아래 일정에 참가 가능한지 체크해주세요</div>
+        <div id="eventList"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">7/30(목) ~ 8/1(토) 참가 가능 시간</div>
+        <div class="grid-note">칸을 드래그하면 여러 칸을 한번에 선택할 수 있어요. (초록색 = 참가 가능)</div>
+        <div id="gridContainer"></div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn">제출하기</button>
+      <div id="statusMsg"></div>
+    </div>
+  </div>
+
+  <!-- 관리자 화면 -->
+  <div id="adminView" class="hidden">
+    <div class="card">
+      <div class="admin-controls">
+        <button class="tabbtn active" id="tabAll">전체 보기</button>
+        <button class="tabbtn" id="tabTeam">팀별 보기</button>
+        <select id="teamFilterSelect" class="hidden"></select>
+        <button id="adminRefreshBtn" style="margin-left:auto;">새로고침</button>
+      </div>
+      <div class="summary-grid" id="summaryGrid"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">사전 일정 참가 여부</div>
+      <div id="adminEventList"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">7/30(목) ~ 8/1(토) 참가 가능 인원</div>
+      <div class="grid-note">숫자에 마우스를 올리면 이름이 보이고, 클릭하면 아래에 펼쳐집니다.</div>
+      <div id="adminGridContainer"></div>
+      <div id="adminGridExpand"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 관리자 비밀번호 모달 -->
+<div class="modal-overlay hidden" id="pwModal">
+  <div class="modal-box">
+    <h3>관리자 비밀번호</h3>
+    <input type="password" id="pwInput" placeholder="비밀번호 입력">
+    <div id="pwErr" style="color:#d32f2f;font-size:12px;margin:-6px 0 10px;"></div>
+    <div class="modal-actions">
+      <button class="cancel" id="pwCancelBtn">취소</button>
+      <button class="confirm" id="pwConfirmBtn">확인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== 설정 ======
+var APPS_SCRIPT_URL = 'PUT_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+var LEADERS = ['권하경','최수인','이예정','허시온','김은성','박수빈','박태희','장혜준','권세영','김수아','정여원'];
+
+var EVENTS = [
+  {key:'e1', label:'7/14(화) 19:30 SP를 위한 기도회 (로방)'},
+  {key:'e2', label:'7/19(주일) 15:30 1차 사전 모임 (201호)'},
+  {key:'e3', label:'7/24(금) 19:00 SP 헌신예배 및 드리미 특송 (201호)'},
+  {key:'e4', label:'7/26(주일) 15:30 2차 사전 모임 (201호)'}
+];
+
+var DAYS = [
+  {key:'0730', label:'7/30(목)', minHour:7,  maxHour:23},
+  {key:'0731', label:'7/31(금)', minHour:0,  maxHour:23},
+  {key:'0801', label:'8/1(토)',  minHour:0,  maxHour:16}
+];
+var HOURS = [];
+for (var h = 0; h < 24; h++) HOURS.push(h);
+
+function pad2(n){ return (n < 10 ? '0' : '') + n; }
+function hourLabel(h){ return pad2(h) + ':00~' + pad2((h+1)%24) + ':00'; }
+function slotKey(dayKey, h){ return dayKey + '_' + pad2(h); }
+function cellEnabled(day, h){ return h >= day.minHour && h <= day.maxHour; }
+
+// ====== 인앱 브라우저 감지 ======
+function detectInAppBrowser(){
+  var ua = navigator.userAgent || '';
+  return /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(ua);
+}
+function openInExternalBrowser(){
+  var url = window.location.href;
+  var ua = navigator.userAgent || '';
+  if (/KAKAOTALK/i.test(ua)) {
+    window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+  } else if (/NAVER/i.test(ua)) {
+    window.location.href = 'naversearchapp://inappbrowser?app=naversearchapp&url=' + encodeURIComponent(url);
+  } else {
+    window.location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+  }
+}
+if (detectInAppBrowser()) {
+  document.getElementById('inappBanner').classList.remove('hidden');
+}
+document.getElementById('openExternalBtn').addEventListener('click', openInExternalBrowser);
+
+// ====== JSONP 통신 (타임아웃 + 1회 재시도) ======
+function jsonpOnce(url){
+  return new Promise(function(resolve, reject){
+    var cbName = '_cb' + Date.now() + Math.floor(Math.random()*1e6);
+    var script = document.createElement('script');
+    script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cbName;
+    var timeoutId = setTimeout(function(){
+      delete window[cbName]; script.remove(); reject(new Error('시간 초과'));
+    }, 10000);
+    window[cbName] = function(data){
+      clearTimeout(timeoutId); delete window[cbName]; script.remove(); resolve(data);
+    };
+    script.onerror = function(){
+      clearTimeout(timeoutId); delete window[cbName]; script.remove(); reject(new Error('요청 실패'));
+    };
+    document.head.appendChild(script);
+  });
+}
+function jsonp(url){
+  return jsonpOnce(url).catch(function(){
+    return new Promise(function(resolve, reject){
+      setTimeout(function(){ jsonpOnce(url).then(resolve).catch(reject); }, 1500);
+    });
+  });
+}
+function callApi(action, params){
+  var url = new URL(APPS_SCRIPT_URL);
+  url.searchParams.set('action', action);
+  if (params) {
+    Object.keys(params).forEach(function(k){ url.searchParams.set(k, params[k]); });
+  }
+  return jsonp(url.toString()).then(function(data){
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  });
+}
+
+// ====== 제출 화면 구성 ======
+var leaderSelect = document.getElementById('leaderSelect');
+LEADERS.forEach(function(name){
+  var opt = document.createElement('option');
+  opt.value = name; opt.textContent = name;
+  leaderSelect.appendChild(opt);
+});
+
+var eventListEl = document.getElementById('eventList');
+EVENTS.forEach(function(ev){
+  var div = document.createElement('div');
+  div.className = 'event-item';
+  div.innerHTML = '<input type="checkbox" id="chk_'+ev.key+'"><label for="chk_'+ev.key+'">'+ev.label+'</label>';
+  eventListEl.appendChild(div);
+});
+
+var selectedSlots = {}; // key -> true
+
+function buildGrid(containerId, opts){
+  opts = opts || {};
+  var readOnly = !!opts.readOnly;
+  var counts = opts.counts || {};   // slotKey -> count
+  var names = opts.names || {};     // slotKey -> [names]
+  var container = document.getElementById(containerId);
+  container.innerHTML = '';
+  var table = document.createElement('table');
+  table.className = 'timegrid';
+
+  var thead = document.createElement('tr');
+  thead.innerHTML = '<th></th>' + DAYS.map(function(d){ return '<th>'+d.label+'</th>'; }).join('');
+  table.appendChild(thead);
+
+  HOURS.forEach(function(h){
+    var tr = document.createElement('tr');
+    var tdLabel = document.createElement('td');
+    tdLabel.className = 'timelabel';
+    tdLabel.textContent = hourLabel(h);
+    tr.appendChild(tdLabel);
+
+    DAYS.forEach(function(day){
+      var td = document.createElement('td');
+      var key = slotKey(day.key, h);
+      if (!cellEnabled(day, h)) {
+        td.className = 'cell disabled';
+      } else if (readOnly) {
+        var cnt = counts[key] || 0;
+        td.className = 'cell count-cell' + (cnt > 0 ? ' has-data' : ' count-zero');
+        td.textContent = cnt > 0 ? cnt : '';
+        td.dataset.slot = key;
+        if (cnt > 0) {
+          td.dataset.names = (names[key] || []).join(', ');
+        }
+      } else {
+        td.className = 'cell';
+        if (selectedSlots[key]) td.className += ' selected';
+        td.dataset.slot = key;
+      }
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  container.appendChild(table);
+  return table;
+}
+
+buildGrid('gridContainer');
+
+// 드래그 선택 (제출 화면 전용)
+(function(){
+  var dragging = false;
+  var paintValue = true;
+  var container = document.getElementById('gridContainer');
+
+  function applyCell(td, value){
+    if (!td || !td.classList.contains('cell') || td.classList.contains('disabled')) return;
+    var key = td.dataset.slot;
+    if (!key) return;
+    selectedSlots[key] = value;
+    td.classList.toggle('selected', !!value);
+  }
+
+  container.addEventListener('pointerdown', function(e){
+    var td = e.target.closest('td.cell');
+    if (!td || td.classList.contains('disabled')) return;
+    dragging = true;
+    var key = td.dataset.slot;
+    paintValue = !selectedSlots[key];
+    applyCell(td, paintValue);
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', function(e){
+    if (!dragging) return;
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    var td = el && el.closest ? el.closest('td.cell') : null;
+    if (td && container.contains(td)) applyCell(td, paintValue);
+  });
+  document.addEventListener('pointerup', function(){ dragging = false; });
+})();
+
+// ====== 이름/팀장 선택 시 체크리스트 노출 ======
+var nameInput = document.getElementById('nameInput');
+var checklistArea = document.getElementById('checklistArea');
+function refreshChecklistVisibility(){
+  var show = nameInput.value.trim().length > 0 && leaderSelect.value !== '';
+  checklistArea.classList.toggle('hidden', !show);
+}
+nameInput.addEventListener('input', refreshChecklistVisibility);
+leaderSelect.addEventListener('change', refreshChecklistVisibility);
+
+// ====== 제출 ======
+var submitBtn = document.getElementById('submitBtn');
+var statusMsg = document.getElementById('statusMsg');
+submitBtn.addEventListener('click', function(){
+  var name = nameInput.value.trim();
+  var leader = leaderSelect.value;
+  if (!name || !leader) return;
+
+  var params = { name: name, leader: leader };
+  EVENTS.forEach(function(ev){
+    params[ev.key] = document.getElementById('chk_'+ev.key).checked ? '1' : '0';
+  });
+  params.grid = JSON.stringify(Object.keys(selectedSlots).filter(function(k){ return selectedSlots[k]; }));
+
+  submitBtn.disabled = true;
+  statusMsg.className = '';
+  statusMsg.textContent = '제출 중...';
+
+  callApi('submit', params).then(function(){
+    statusMsg.className = 'ok';
+    statusMsg.textContent = '제출이 완료되었습니다. 감사합니다!';
+  }).catch(function(err){
+    statusMsg.className = 'err';
+    statusMsg.textContent = '오류: ' + err.message;
+  }).finally(function(){
+    submitBtn.disabled = false;
+  });
+});
+
+// ====== 관리자 모드 ======
+var pwModal = document.getElementById('pwModal');
+var pwInput = document.getElementById('pwInput');
+var pwErr = document.getElementById('pwErr');
+var submitView = document.getElementById('submitView');
+var adminView = document.getElementById('adminView');
+var wrapEl = document.getElementById('wrap');
+var ADMIN_PW = 'SPcaptain';
+var adminData = null; // { rows: [...] }
+
+document.getElementById('adminToggleBtn').addEventListener('click', function(){
+  if (!adminView.classList.contains('hidden')) {
+    adminView.classList.add('hidden');
+    submitView.classList.remove('hidden');
+    wrapEl.classList.remove('admin-wide');
+    return;
+  }
+  pwErr.textContent = '';
+  pwInput.value = '';
+  pwModal.classList.remove('hidden');
+  pwInput.focus();
+});
+document.getElementById('pwCancelBtn').addEventListener('click', function(){
+  pwModal.classList.add('hidden');
+});
+document.getElementById('pwConfirmBtn').addEventListener('click', function(){
+  if (pwInput.value !== ADMIN_PW) {
+    pwErr.textContent = '비밀번호가 일치하지 않습니다.';
+    return;
+  }
+  pwModal.classList.add('hidden');
+  submitView.classList.add('hidden');
+  adminView.classList.remove('hidden');
+  wrapEl.classList.add('admin-wide');
+  loadAdminData();
+});
+pwInput.addEventListener('keydown', function(e){
+  if (e.key === 'Enter') document.getElementById('pwConfirmBtn').click();
+});
+document.getElementById('adminRefreshBtn').addEventListener('click', loadAdminData);
+
+var currentTeamFilter = null; // null = 전체
+document.getElementById('tabAll').addEventListener('click', function(){
+  currentTeamFilter = null;
+  document.getElementById('tabAll').classList.add('active');
+  document.getElementById('tabTeam').classList.remove('active');
+  document.getElementById('teamFilterSelect').classList.add('hidden');
+  renderAdmin();
+});
+document.getElementById('tabTeam').addEventListener('click', function(){
+  var sel = document.getElementById('teamFilterSelect');
+  sel.classList.remove('hidden');
+  currentTeamFilter = sel.value || LEADERS[0];
+  sel.value = currentTeamFilter;
+  document.getElementById('tabTeam').classList.add('active');
+  document.getElementById('tabAll').classList.remove('active');
+  renderAdmin();
+});
+var teamFilterSelect = document.getElementById('teamFilterSelect');
+LEADERS.forEach(function(name){
+  var opt = document.createElement('option');
+  opt.value = name; opt.textContent = name;
+  teamFilterSelect.appendChild(opt);
+});
+teamFilterSelect.addEventListener('change', function(){
+  currentTeamFilter = teamFilterSelect.value;
+  renderAdmin();
+});
+
+function loadAdminData(){
+  document.getElementById('summaryGrid').innerHTML = '<div class="loading">불러오는 중...</div>';
+  callApi('getAll', { pw: ADMIN_PW }).then(function(data){
+    adminData = data;
+    renderAdmin();
+  }).catch(function(err){
+    document.getElementById('summaryGrid').innerHTML = '<div class="loading">오류: ' + err.message + '</div>';
+  });
+}
+
+function currentRows(){
+  if (!adminData) return [];
+  if (!currentTeamFilter) return adminData.rows;
+  return adminData.rows.filter(function(r){ return r.leader === currentTeamFilter; });
+}
+
+function renderAdmin(){
+  if (!adminData) return;
+  var rows = currentRows();
+
+  // 요약
+  var summaryEl = document.getElementById('summaryGrid');
+  summaryEl.innerHTML = '';
+  var totalBox = document.createElement('div');
+  totalBox.className = 'summary-box';
+  totalBox.innerHTML = '<div class="num">'+adminData.rows.length+'</div><div class="lbl">전체 응답</div>';
+  summaryEl.appendChild(totalBox);
+
+  LEADERS.forEach(function(leader){
+    var cnt = adminData.rows.filter(function(r){ return r.leader === leader; }).length;
+    var box = document.createElement('div');
+    box.className = 'summary-box';
+    box.innerHTML = '<div class="num">'+cnt+'</div><div class="lbl">'+leader+' 팀</div>';
+    summaryEl.appendChild(box);
+  });
+
+  // 사전 일정 카운트
+  var evListEl = document.getElementById('adminEventList');
+  evListEl.innerHTML = '';
+  EVENTS.forEach(function(ev, idx){
+    var respondents = rows.filter(function(r){ return r.events[idx]; });
+    var row = document.createElement('div');
+    row.className = 'event-count-row';
+    row.innerHTML = '<span>'+ev.label+'</span><span class="cnt">'+respondents.length+'명</span>';
+    var panel = document.createElement('div');
+    panel.className = 'expand-panel hidden';
+    panel.innerHTML = respondents.length
+      ? respondents.map(function(r){ return r.name + ' (' + r.leader + ')'; }).join(', ')
+      : '<span class="none">참가 가능 인원이 없습니다.</span>';
+    row.addEventListener('click', function(){ panel.classList.toggle('hidden'); });
+    evListEl.appendChild(row);
+    evListEl.appendChild(panel);
+  });
+
+  // 시간 그리드 카운트
+  var counts = {}, names = {};
+  DAYS.forEach(function(day){
+    HOURS.forEach(function(h){
+      if (!cellEnabled(day, h)) return;
+      var key = slotKey(day.key, h);
+      counts[key] = 0; names[key] = [];
+    });
+  });
+  rows.forEach(function(r){
+    (r.grid || []).forEach(function(key){
+      if (counts[key] === undefined) return;
+      counts[key]++;
+      names[key].push(r.name + '(' + r.leader + ')');
+    });
+  });
+  buildGrid('adminGridContainer', { readOnly: true, counts: counts, names: names });
+
+  var expandEl = document.getElementById('adminGridExpand');
+  expandEl.innerHTML = '';
+  attachAdminGridInteractions(names);
+}
+
+function attachAdminGridInteractions(names){
+  var tooltip = document.getElementById('tooltip');
+  var container = document.getElementById('adminGridContainer');
+  var expandEl = document.getElementById('adminGridExpand');
+
+  container.querySelectorAll('td.count-cell').forEach(function(td){
+    td.addEventListener('mouseenter', function(e){
+      if (!td.classList.contains('has-data')) return;
+      tooltip.textContent = td.dataset.names;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top = (e.clientY + 12) + 'px';
+    });
+    td.addEventListener('mousemove', function(e){
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top = (e.clientY + 12) + 'px';
+    });
+    td.addEventListener('mouseleave', function(){
+      tooltip.style.display = 'none';
+    });
+    td.addEventListener('click', function(){
+      if (!td.classList.contains('has-data')) return;
+      var key = td.dataset.slot;
+      var day = DAYS.filter(function(d){ return key.indexOf(d.key) === 0; })[0];
+      var h = parseInt(key.split('_')[1], 10);
+      var label = (day ? day.label : '') + ' ' + hourLabel(h);
+      expandEl.innerHTML = '<div class="expand-panel"><b>' + label + '</b> 참가 가능 (' +
+        (names[key] || []).length + '명)<br>' + (names[key] || []).join(', ') + '</div>';
+      expandEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+    });
+  });
+}
+</script>
+</body>
+</html>
