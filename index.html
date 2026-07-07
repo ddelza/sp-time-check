@@ -378,31 +378,28 @@ if (detectInAppBrowser()) {
 }
 document.getElementById('openExternalBtn').addEventListener('click', openInExternalBrowser);
 
-// ====== JSONP 통신 (타임아웃 + 재시도) ======
-function jsonpOnce(url){
-  return new Promise(function(resolve, reject){
-    var cbName = '_cb' + Date.now() + Math.floor(Math.random()*1e6);
-    var script = document.createElement('script');
-    script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cbName;
-    var timeoutId = setTimeout(function(){
-      delete window[cbName]; script.remove(); reject(new Error('시간 초과'));
-    }, 15000);
-    window[cbName] = function(data){
-      clearTimeout(timeoutId); delete window[cbName]; script.remove(); resolve(data);
-    };
-    script.onerror = function(){
-      clearTimeout(timeoutId); delete window[cbName]; script.remove(); reject(new Error('요청 실패'));
-    };
-    document.head.appendChild(script);
+// ====== API 통신 (fetch, 타임아웃 + 재시도) ======
+// Apps Script가 Access-Control-Allow-Origin: * 헤더를 보내주므로 fetch를 바로 쓸 수 있다.
+// (JSONP의 callback= 파라미터 패턴은 광고차단 확장프로그램에 흔히 차단되어 fetch로 대체함)
+function fetchOnce(url){
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function(){ controller.abort(); }, 15000);
+  return fetch(url, { method: 'GET', signal: controller.signal }).then(function(res){
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error('서버 오류 (' + res.status + ')');
+    return res.json();
+  }).catch(function(err){
+    clearTimeout(timeoutId);
+    throw err;
   });
 }
-function jsonp(url, attemptsLeft){
+function fetchWithRetry(url, attemptsLeft){
   if (attemptsLeft === undefined) attemptsLeft = 3;
-  return jsonpOnce(url).catch(function(err){
+  return fetchOnce(url).catch(function(err){
     if (attemptsLeft <= 1) throw err;
     return new Promise(function(resolve, reject){
       setTimeout(function(){
-        jsonp(url, attemptsLeft - 1).then(resolve).catch(reject);
+        fetchWithRetry(url, attemptsLeft - 1).then(resolve).catch(reject);
       }, 1500);
     });
   });
@@ -413,7 +410,7 @@ function callApi(action, params){
   if (params) {
     Object.keys(params).forEach(function(k){ url.searchParams.set(k, params[k]); });
   }
-  return jsonp(url.toString()).then(function(data){
+  return fetchWithRetry(url.toString()).then(function(data){
     if (data && data.error) throw new Error(data.error);
     return data;
   });
