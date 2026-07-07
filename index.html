@@ -378,7 +378,7 @@ if (detectInAppBrowser()) {
 }
 document.getElementById('openExternalBtn').addEventListener('click', openInExternalBrowser);
 
-// ====== JSONP 통신 (타임아웃 + 1회 재시도) ======
+// ====== JSONP 통신 (타임아웃 + 재시도) ======
 function jsonpOnce(url){
   return new Promise(function(resolve, reject){
     var cbName = '_cb' + Date.now() + Math.floor(Math.random()*1e6);
@@ -386,7 +386,7 @@ function jsonpOnce(url){
     script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cbName;
     var timeoutId = setTimeout(function(){
       delete window[cbName]; script.remove(); reject(new Error('시간 초과'));
-    }, 10000);
+    }, 15000);
     window[cbName] = function(data){
       clearTimeout(timeoutId); delete window[cbName]; script.remove(); resolve(data);
     };
@@ -396,10 +396,14 @@ function jsonpOnce(url){
     document.head.appendChild(script);
   });
 }
-function jsonp(url){
-  return jsonpOnce(url).catch(function(){
+function jsonp(url, attemptsLeft){
+  if (attemptsLeft === undefined) attemptsLeft = 3;
+  return jsonpOnce(url).catch(function(err){
+    if (attemptsLeft <= 1) throw err;
     return new Promise(function(resolve, reject){
-      setTimeout(function(){ jsonpOnce(url).then(resolve).catch(reject); }, 1500);
+      setTimeout(function(){
+        jsonp(url, attemptsLeft - 1).then(resolve).catch(reject);
+      }, 1500);
     });
   });
 }
